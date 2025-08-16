@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Proyecto-aprender</title>
+</head>
+<body>
+	<h1>Registrarse</h1>
+	<form action="/registrarse" method="POST">
+		<div><input type="text" placeholder="Nombre de usuario" name="nombreDeUsuario"></div>
+		<div><input type="email" placeholder="E-Mail" name="email"></div>
+		<div>
+			<label for="genero">Elige un genero:</label>
+			<select name="genero" id="generos">
+				<option value="hombre">Hombre</option>
+				<option value="mujer">Mujer</option>
+				<option value="otro">Otro</option>
+			</select>
+			<input type="number" placeholder="edad" name="edad">
+		</div>
+		<div>
+			<input type="password" placeholder="Contraseña" name="contraseña">
+			<input type="password" placeholder="Confirmar contraseña" name="confirmarContraseña">
+		</div>
+		<input type="submit">
+    	<a href="http://localhost:3000/">atras</a>
+	</form>
+</body>
+</html>
