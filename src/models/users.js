@@ -1,6 +1,7 @@
 //primero importamos sequelize para definir el modelo de usuarios
 import { DataTypes } from "sequelize";
 import sequelize from "../DB/connectDB.js";
+import { tr } from "zod/locales";
 
 
 //definimos el modelo de usuarios
@@ -56,8 +57,14 @@ const usuarios = sequelize.define('usuarios',{
             len:[5,100]
         }
     }
-})
+}
+,{timestamps: true},
+{
+    tableName: 'usuarios', //nombre de la tabla en la base de datos
+}
+)
 
+//sequelize.sync()
 
 //sincronizamos el modelo con la base de datos
 //esto creará la tabla si no existe o actualizará la tabla si ya existe
