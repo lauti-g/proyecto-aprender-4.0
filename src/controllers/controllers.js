@@ -9,6 +9,8 @@ import {
 } from "../../zodSchema.js";
 import z from "zod";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import "dotenv/config";
 
 //creamos las rutas que van a ser utilizadas en la aplicación, empezamos con el verbo GET para las páginas principales
 //la ruta raíz que renderiza la página de inicio
@@ -26,9 +28,29 @@ router.get("/iniciarSesion", (req, res) => {
     res.status(200).render("iniciarSesion");
 });
 
+
+function esUsuario(req, res, next) {
+    header = req.headers;
+    console.log(header);
+    verificacion = jwt.verify(token, process.env.JWTPassword, (err, decoded) => {
+        if (err) {
+            return res.status(401).send("Token inválido");
+        } else {
+            req.usuario = decoded;
+            console.log(req.usuario);
+            next();
+        }
+    });
+}
+
+
 //la ruta que renderiza la página de mi perfil
-router.get("/miPerfil", (req, res) => {
+router.get("/miPerfil", esUsuario, (req, res) => {
     res.status(200).render("miPerfil");
+});
+
+router.get("/panelAdministrativo", (req, res) => {
+    res.status(200).render("panelAdministrativo");
 });
 
 //esta es la ruta post que se encarga de registrar al usuario
@@ -48,21 +70,11 @@ router.post("/registrarse", async (req, res) => {
         //si alguno de los dos no es null, significa que ya existe un usuario con ese nombre de usuario o email
         //y se envía un mensaje de error correspondiente
         if (viejosDatos !== null) {
-            //verificamos cuál de los dos es el que ya existe y enviamos el mensaje de error correspondiente
-            //aca verifcamos si el usuario existe
-            if (
-                viejosDatos.email === null &&
-                viejosDatos.nombreDeUsuario !== null
-            ) {
-                throw res.status(409).send("nombre de usuario en uso");
+            throw res.status(409).send("email o nombre de usuario en uso");
+        }
 
-                //aca verificamos si el email existe
-            } else {
-                throw res.status(409).send("email en uso");
-            }
-
-            //si ambos son null, significa que no hay conflictos y se puede continuar con el registro
-        } else {
+        //si ambos son null, significa que no hay conflictos y se puede continuar con el registro
+        else {
             //convertimos la edad a número para que pase la validación del esquema debido a que los datos del formulario llegan como strings
             req.body.edad = Number(req.body.edad);
 
@@ -85,25 +97,32 @@ router.post("/registrarse", async (req, res) => {
             if (resultado) {
                 //creamos el usuario en la base de datos
                 await usuarios.create(req.body);
-
-                //buscamos los datos del usuario recién creado para renderizarlos en la vista de mi perfil, como la basede datos nos devuelve un objeto, hay que acceder a la propiedad correspondiente
-                const datos = await usuarios.findOne({
+                //obtenemos datos del usuario recién creado para generar el token
+                const usuario = await usuarios.findOne({
                     where: { nombreDeUsuario: `${req.body.nombreDeUsuario}` },
                     raw: true,
-                    attributes: ["nombreDeUsuario", "email", "edad", "genero"],
+                    attributes: ["id", "nombreDeUsuario", "rol"],
                 });
-                const nombreDeUsuario = datos.nombreDeUsuario;
-                const email = datos.email;
-                const edad = datos.edad;
-                const genero = datos.genero;
 
-                //renderizamos la vista de mi perfil con los datos del usuario
-                res.status(200).render(`miPerfil`, {
-                    email,
-                    edad,
-                    nombreDeUsuario,
-                    genero,
+
+                //creamos el token con el id del usuario y lo firmamos con una clave secreta
+                const token = await jwt.sign(
+                    {
+                        "sub": `${usuario.id}`,
+                        "name": `${usuario.nombreDeUsuario}`,
+                        "rol": `${usuario.rol}`,
+                        "exp": 50,
+                    },
+                    `${process.env.JWTPassword}`
+                );
+                res.cookie("token", token, {
+                    httpOnly: true,
+                    secure: true, 
+                    sameSite: "strict", //esto es para que la cookie solo se envíe en solicitudes del mismo sitio
                 });
+                console.log(res.cookie);
+                //renderizamos la vista bienvenido
+                res.status(200).render(`bienvenido`, {token});
             } else {
                 //si las contraseñas no coinciden, se envía un mensaje de error
                 res.status(400).send("no coinciden las contraseñas");
@@ -150,25 +169,8 @@ router.post("/iniciarSesion", async (req, res) => {
         throw res.status(400).send("contraseña incorrecta");
     }
 
-    //si coinciden buscamos los datos del usuario para renderizarlos en la vista de mi perfil
-    //como la base de datos nos devuelve un objeto, hay que acceder a la propiedad correspondiente para cada dato que queremos mostrar en la vista
-    const datos = await usuarios.findOne({
-        where: { nombreDeUsuario: `${req.body.nombreDeUsuario}` },
-        raw: true,
-        attributes: ["nombreDeUsuario", "email", "edad", "genero"],
-    });
-    const nombreDeUsuario = datos.nombreDeUsuario;
-    const email = datos.email;
-    const edad = datos.edad;
-    const genero = datos.genero;
-
     //renderizamos la vista de mi perfil con los datos del usuario
-    res.status(200).render(`miPerfil`, {
-        email,
-        edad,
-        nombreDeUsuario,
-        genero,
-    });
+    res.status(200).render(`miPerfil`);
 });
 
 //esta es la ruta put que se encarga de cambiar el nombre de usuario
