@@ -30,9 +30,9 @@ router.get("/iniciarSesion", (req, res) => {
 
 
 function esUsuario(req, res, next) {
-    header = req.headers;
-    console.log(header);
-    verificacion = jwt.verify(token, process.env.JWTPassword, (err, decoded) => {
+    //RECIBIMOS EL TOKEN 
+    const token = req.cookies.token;
+    const verificacion = jwt.verify(token, process.env.JWTPassword, (err, decoded) => {
         if (err) {
             return res.status(401).send("Token inválido");
         } else {
@@ -44,12 +44,27 @@ function esUsuario(req, res, next) {
 }
 
 
+
+function esAdmin(req, res, next) {
+    //RECIBIMOS EL TOKEN 
+    const token = req.cookies.token;
+    const verificacion = jwt.verify(token, process.env.JWTPassword, (err, decoded) => {
+        if (err) {
+            return res.status(401).send("Token inválido");
+        } else {
+            req.usuario = decoded;
+            console.log(req.usuario);
+            req.usuario.rol === "administrador" ? next() : res.status(403).send("No tienes permisos para acceder a esta página");
+        }
+    });
+}
+
 //la ruta que renderiza la página de mi perfil
 router.get("/miPerfil", esUsuario, (req, res) => {
     res.status(200).render("miPerfil");
 });
 
-router.get("/panelAdministrativo", (req, res) => {
+router.get("/panelAdministrativo", esAdmin, (req, res) => {
     res.status(200).render("panelAdministrativo");
 });
 
@@ -110,19 +125,21 @@ router.post("/registrarse", async (req, res) => {
                     {
                         "sub": `${usuario.id}`,
                         "name": `${usuario.nombreDeUsuario}`,
-                        "rol": `${usuario.rol}`,
-                        "exp": 50,
+                        "rol": `${usuario.rol}`
                     },
-                    `${process.env.JWTPassword}`
+                    `${process.env.JWTPassword}`,
+                    { expiresIn: '1h' }
                 );
-                res.cookie("token", token, {
+
+                // guardar token en cookie HTTP-only y redirigir al perfil protegido
+                res.cookie('token', token, {
                     httpOnly: true,
-                    secure: true, 
-                    sameSite: "strict", //esto es para que la cookie solo se envíe en solicitudes del mismo sitio
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'lax',
+                    maxAge: 1000 * 60 * 60 // 1 hora
                 });
-                console.log(res.cookie);
-                //renderizamos la vista bienvenido
-                res.status(200).render(`bienvenido`, {token});
+                //rendirijimos la vista a mi perfil
+                res.status(200).redirect(`miPerfil`);
             } else {
                 //si las contraseñas no coinciden, se envía un mensaje de error
                 res.status(400).send("no coinciden las contraseñas");
@@ -149,7 +166,7 @@ router.post("/iniciarSesion", async (req, res) => {
     const usuario = await usuarios.findOne({
         where: { nombreDeUsuario: `${req.body.nombreDeUsuario}` },
         raw: true,
-        attributes: ["nombreDeUsuario", "contraseña", "id"],
+        attributes: ["nombreDeUsuario", "contraseña", "id", "rol"],
     });
 
     //si el usuario no existe, se envía un mensaje de error
@@ -169,8 +186,27 @@ router.post("/iniciarSesion", async (req, res) => {
         throw res.status(400).send("contraseña incorrecta");
     }
 
-    //renderizamos la vista de mi perfil con los datos del usuario
-    res.status(200).render(`miPerfil`);
+
+                //creamos el token con el id del usuario y lo firmamos con una clave secreta
+                const token = await jwt.sign(
+                    {
+                        "sub": `${usuario.id}`,
+                        "name": `${usuario.nombreDeUsuario}`,
+                        "rol": `${usuario.rol}`
+                    },
+                    `${process.env.JWTPassword}`,
+                    { expiresIn: '1h' }
+                );
+
+                // guardar token en cookie HTTP-only y redirigir al perfil protegido
+                res.cookie('token', token, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'lax',
+                    maxAge: 1000 * 60 * 60 // 1 hora
+                });
+                //rendirijimos la vista a mi perfil
+                res.status(200).redirect(`miPerfil`);
 });
 
 //esta es la ruta put que se encarga de cambiar el nombre de usuario

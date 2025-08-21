@@ -4,6 +4,7 @@ import path from 'path'
 import 'ejs'
 import { fileURLToPath } from 'url';
 import routes from "./router/routes.js";
+import cookieParser from "cookie-parser";
 
 
 //iniciamos express y configuramos la ruta de las vistas
@@ -19,6 +20,7 @@ config.set('view engine', 'ejs')
 //configuramos express para que lea archivos json y urlencoded
 config.use(express.json())
 config.use(express.urlencoded({extended:false}))
+config.use(cookieParser());
 
 
 //le decimos que use routes para manejar las rutas
